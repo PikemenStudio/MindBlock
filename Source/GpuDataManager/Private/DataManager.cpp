@@ -35,7 +35,7 @@ void ADataManager::OnCanvasRenderTargetUpdate(UCanvas* Canvas, int32 Width, int3
 				while (!It.IsEnd())
 				{
 					const float CurrentArrayValue = *(*It).GetValue();
-					const FLinearColor RenderColor({CurrentArrayValue, 0, 0});
+					const FLinearColor RenderColor {CurrentArrayValue, 0, 0};
 					const FVector2D PixelPos = ToImageCoord(It.GetPlainIndex());
 
 					FCanvasTileItem Tile (PixelPos, FVector2D::UnitVector, RenderColor);

@@ -21,7 +21,8 @@ public:
 
 	bool ValidatePlaneIndex(int32 Index);
 
-	template <typename U> requires std::is_same_v<T, U>
+	template <typename U>// requires std::is_same_v<T, U>
+	requires requires { typename std::enable_if_t<std::is_same_v<T, U>>; }
 	class TGenericDataArrayIterator
 	{
 	public:
@@ -110,7 +111,8 @@ bool TGenericDataArray<T>::ValidatePlaneIndex(int32 Index)
 }
 
 template <typename T>
-template <typename U> requires std::is_same_v<T, U>
+template <typename U>//requires std::is_same_v<T, U>
+requires requires { typename std::enable_if_t<std::is_same_v<T, U>>; }
 typename TGenericDataArray<T>::template TGenericDataArrayIterator<U>& TGenericDataArray<T>::TGenericDataArrayIterator<U>::
 operator++()
 {
@@ -119,14 +121,16 @@ operator++()
 }
 
 template <typename T>
-template <typename U> requires std::is_same_v<T, U>
+template <typename U>// requires std::is_same_v<T, U>
+requires requires { typename std::enable_if_t<std::is_same_v<T, U>>; }
 bool TGenericDataArray<T>::TGenericDataArrayIterator<U>::IsEnd() const
 {
 	return Index >= Array.Data.Num();
 }
 
 template <typename T>
-template <typename U> requires std::is_same_v<T, U>
+template <typename U>// requires std::is_same_v<T, U>
+requires requires { typename std::enable_if_t<std::is_same_v<T, U>>; }
 TOptional<T*> TGenericDataArray<T>::TGenericDataArrayIterator<U>::operator*()
 {
 	if (IsEnd())
@@ -137,7 +141,8 @@ TOptional<T*> TGenericDataArray<T>::TGenericDataArrayIterator<U>::operator*()
 }
 
 template <typename T>
-template <typename U> requires std::is_same_v<T, U>
+template <typename U>// requires std::is_same_v<T, U>
+requires requires { typename std::enable_if_t<std::is_same_v<T, U>>; }
 int32 TGenericDataArray<T>::TGenericDataArrayIterator<U>::GetPlainIndex() const
 {
 	return Index;
