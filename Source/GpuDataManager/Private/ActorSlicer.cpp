@@ -221,7 +221,7 @@ TArray<float> UActorSlicer::CalculateSliceOnPlane(const FVector& PlaneOrigin,
 		const FRotator& PointCloudRotation,
 		const FVector& PointCloudOrigin,
 		const FVector2D& ImagePhysicalSize,
-		const FIntPoint& TargetImageSize)
+		const FIntPoint& TargetImageSize) const
 {
 	if (!CachedCloud.IsSet()) {
 		UE_LOG(LogTemp, Error, TEXT("Point cloud is not cached!"));

@@ -57,7 +57,7 @@ public:
 		const FVector& PointCloudOrigin,
 		const FVector2D& ImagePhysicalSize,
 		const FIntPoint& TargetImageSize
-	);
+	) const;
 
 	UFUNCTION(BlueprintCallable)
 	FString SliceToString(const TArray<float> &Src);
