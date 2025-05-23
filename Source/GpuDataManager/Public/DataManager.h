@@ -75,8 +75,8 @@ public:
 	FVector2D ToImageCoord(const int32 PlainCoord) const
 	{
 		return {
-			static_cast<double>(PlainCoord / TextureSize),
-			static_cast<double>(PlainCoord % TextureSize) };
+			static_cast<double>(PlainCoord % TextureSize),
+		static_cast<double>(PlainCoord / TextureSize)};
 	}
 
 	TGenericDataArray<float>* GetOrCreateFloatArray()
