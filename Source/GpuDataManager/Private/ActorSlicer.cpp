@@ -38,7 +38,7 @@ void UActorSlicer::TickComponent(float DeltaTime, ELevelTick TickType, FActorCom
 	// ...
 }
 
-FString UActorSlicer::FPointCloud::ToString() const
+FString FPointCloud::ToString() const
 {
 	FString Out;
 	for (int32 z = 0; z < PointDensity.Z; ++z)
@@ -57,19 +57,48 @@ FString UActorSlicer::FPointCloud::ToString() const
 	return Out;
 }
 
-int32 UActorSlicer::FPointCloud::ToPlainIndex(const FIntVector& Coord, const FIntVector& MatrixSize)
+int32 FPointCloud::ToPlainIndex(const FIntVector& Coord, const FIntVector& MatrixSize)
 {
 	return Coord.X + Coord.Y * MatrixSize.X + Coord.Z * MatrixSize.X * MatrixSize.Y;
 }
 
-bool UActorSlicer::FPointCloud::IsValid(const FIntVector& Coord) const
+bool FPointCloud::IsValid(const FIntVector& Coord) const
 {
 	return  Coord.X >= 0 && Coord.X < PointDensity.X &&
 			Coord.Y >= 0 && Coord.Y < PointDensity.Y &&
 			Coord.Z >= 0 && Coord.Z < PointDensity.Z;
 }
 
-UActorSlicer::FPointCloud UActorSlicer::GeneratePointCloud(FVector SlicerBoxLocation, FVector SlicerBoxExtent, FIntVector PointDensity, bool DrawDebugInfo) const
+USlice::USlice(TArray<float> Data, FVector2D TargetPhysicalSize, const FIntPoint TargetResolution) :
+	TArray(std::move(Data)),
+	PhysicalSize(std::move(TargetPhysicalSize)),
+	Resolution(FIntVector2(TargetResolution.X, TargetResolution.Y))
+{
+}
+
+void USlice::ReInit(TArray<float> Data, FVector2D TargetPhysicalSize, const FIntPoint TargetResolution)
+{
+	*dynamic_cast<TArray*>(this) = std::move(Data);
+	PhysicalSize = std::move(TargetPhysicalSize);
+	Resolution = FIntVector2(TargetResolution.X, TargetResolution.Y);
+}
+
+TArray<float>& USlice::GetSliceData()
+{
+	return dynamic_cast<TArray&>(*this);
+}
+
+FVector2D& USlice::GetTargetPhysicalSize()
+{
+	return PhysicalSize;
+}
+
+FIntPoint USlice::GetTargetResolution()
+{
+	return { Resolution.X, Resolution.Y };
+}
+
+FPointCloud UActorSlicer::GeneratePointCloud(FVector SlicerBoxLocation, FVector SlicerBoxExtent, FIntVector PointDensity, bool DrawDebugInfo) const
 {
 	// Use the box bounds in world space
 	FVector Min = SlicerBoxLocation - SlicerBoxExtent;
