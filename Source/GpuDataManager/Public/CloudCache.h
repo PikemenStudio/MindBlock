@@ -4,14 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
-#include "ActorSlicer.h"
+#include "SliceRelatedTypes.h"
 #include "CloudCache.generated.h"
 
 #define NOT_IMPLEMENTED UE_LOG(LogTemp, Warning, TEXT("NotImplementedFunction() is not implemented!")); ensure(false)
 /**
  * 
  */
-UCLASS()
+UCLASS(BlueprintType)
 class GPUDATAMANAGER_API UCloudCache : public UObject
 {
 	GENERATED_BODY()
@@ -20,34 +20,37 @@ public:
 	// Work with disk
 	UFUNCTION(BlueprintCallable,
 		meta=(ToolTip="Save CloudPack to the disk, works on any platform"))
-	void Save() { NOT_IMPLEMENTED; }
+	void Save();
 
 	UFUNCTION(BlueprintCallable,
 		meta=(ToolTip="Update CloudPack data if necessary"))
-	void Load() { NOT_IMPLEMENTED; }
+	void Load();
 
 	// Work with clouds
 	UFUNCTION(BlueprintCallable,
 		meta=(ToolTip="Save Cloud value on RAM by CloudTag; to update cloud value just provide existed tag"))
-	void SetCloudValue(const FName &CloudTag, FPointCloud Cloud) { NOT_IMPLEMENTED; }
+	void SetCloudValue(const FName &CloudTag, FPointCloud Cloud);
 
 	UFUNCTION(BlueprintCallable,
 		meta=(ToolTip="Get pair<cloudValue, slicePack> by tag"))
-	UCloud* GetCloudWithSlices(const FName &CloudTag) { NOT_IMPLEMENTED; return nullptr; }
+	FCloud GetCloudWithSlices(const FName &CloudTag, bool &Success);
 
 	UFUNCTION(BlueprintCallable,
 		meta=(ToolTip="Get cloud value by tag"))
-	FPointCloud& GetCloud(const FName &CloudTag) { NOT_IMPLEMENTED; FPointCloud *a = new FPointCloud; return *a; }
+	FPointCloud GetCloud(const FName &CloudTag, bool &Success );
 
 	UFUNCTION(BlueprintCallable,
 		meta=(ToolTip="Set slice by its tag and tag of the cloud slice was produced from"))
-	void SetSlice(const FName &CloudTag, const FName &SliceTag, USlice *Slice) { NOT_IMPLEMENTED; }
+	void SetSlice(const FName &CloudTag, const FName &SliceTag, FSlice Slice);
 
 	UFUNCTION(BlueprintCallable,
 		meta=(ToolTip="Get slice by its tag and tag of the cloud slice was produced from"))
-	USlice* GetSlice(const FName &CloudTag, const FName &SliceTag) { NOT_IMPLEMENTED; return nullptr; }
+	FSlice GetSlice(const FName &CloudTag, const FName &SliceTag, bool &Success);
+
+	UFUNCTION(BlueprintCallable)
+	void FillByTestData();
 	
 private:
 	// RAM storage
-	UCloudPack CloudPack {};
+	FCloudPack CloudPack {};
 };

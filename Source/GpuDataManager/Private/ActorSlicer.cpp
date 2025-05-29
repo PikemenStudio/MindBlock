@@ -3,14 +3,85 @@
 
 #include "ActorSlicer.h"
 
-#include <string>
+#include <iomanip>
+#include <sstream>
 
-#include "Kismet/BlueprintTypeConversions.h"
+#include "JsonObjectConverter.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
 
+#define LOG_ERROR(ErrorText) UE_LOG(LogTemp, Warning, TEXT("ActorSlicer %s: %s"), *FString(__func__), *FString(ErrorText));
+
+TSharedPtr<FJsonObject> FCloudPack::ToJsonObject(TOptional<FString> OutMessage) const
+{
+	auto JsonObject = FJsonObjectConverter::UStructToJsonObject(*this);
+	if (!JsonObject)
+	{
+		return nullptr;
+	}
+	return JsonObject;
+}
+
+TOptional<FCloudPack> FCloudPack::FromJsonObject(TSharedPtr<FJsonObject> Src)
+{
+	FCloudPack CloudPack;
+	if (!FJsonObjectConverter::JsonObjectToUStruct<FCloudPack>(Src.ToSharedRef(), &CloudPack))
+	{
+		return {};
+	}
+	return CloudPack;
+}
+
+FString FCloudPack::Serialize(TSharedPtr<FJsonObject> JsonObject)
+{
+	FString JsonString;
+	if (!FJsonSerializer::Serialize(JsonObject.ToSharedRef(), TJsonWriterFactory<>::Create(&JsonString)))
+	{
+		return "";
+	}
+
+	return JsonString;
+}
+
+TSharedPtr<FJsonObject> FCloudPack::Deserialize(const FString& JsonString)
+{
+	TSharedPtr<FJsonObject> JsonObject;
+	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(JsonString), JsonObject))
+	{
+		return nullptr;
+	}
+
+	return JsonObject;
+}
+
+void FCloudPack::WriteToFile(const FString& Text, const FString& FileName)
+{
+	if (!FFileHelper::SaveStringToFile(*Text, *FileName))
+	{
+		// Error
+		return;
+	}
+}
+
+FString FCloudPack::ReadFromFile(const FString& FileName)
+{
+	if (!FPlatformFileManager::Get().GetPlatformFile().FileExists(*FileName))
+	{
+		// Error
+		return {};
+	}
+
+	FString Result;
+	if (!FFileHelper::LoadFileToString(Result, *FileName))
+	{
+		// Error
+		return {};
+	}
+	return Result;
+}
+
 // Sets default values for this component's properties
-UActorSlicer::UActorSlicer() : CachedCloud{}
+UActorSlicer::UActorSlicer()
 {
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.
@@ -38,23 +109,10 @@ void UActorSlicer::TickComponent(float DeltaTime, ELevelTick TickType, FActorCom
 	// ...
 }
 
-FString FPointCloud::ToString() const
+void UActorSlicer::SetCachePointer(const TSoftObjectPtr<UCloudCache> CachePtr, const FName CloudCacheTag)
 {
-	FString Out;
-	for (int32 z = 0; z < PointDensity.Z; ++z)
-	{
-		Out += FString::Printf(TEXT("Z=%d\n"), z);
-		for (int32 y = 0; y < PointDensity.Y; ++y)
-		{
-			for (int32 x = 0; x < PointDensity.X; ++x)
-			{
-				const int32 Index = ToPlainIndex({x, y, z}, this->PointDensity);
-				Out += Points[Index] ? TEXT("X") : TEXT(".");
-			}
-			Out += TEXT("\n");
-		}
-	}
-	return Out;
+	Cache = CachePtr;
+	this->CloudCacheTag = CloudCacheTag;
 }
 
 int32 FPointCloud::ToPlainIndex(const FIntVector& Coord, const FIntVector& MatrixSize)
@@ -69,33 +127,11 @@ bool FPointCloud::IsValid(const FIntVector& Coord) const
 			Coord.Z >= 0 && Coord.Z < PointDensity.Z;
 }
 
-USlice::USlice(TArray<float> Data, FVector2D TargetPhysicalSize, const FIntPoint TargetResolution) :
-	TArray(std::move(Data)),
+FSlice::FSlice(TArray<float> Data, FVector2D TargetPhysicalSize, const FIntPoint TargetResolution) :
 	PhysicalSize(std::move(TargetPhysicalSize)),
-	Resolution(FIntVector2(TargetResolution.X, TargetResolution.Y))
+	Resolution(TargetResolution),
+	Data(std::move(Data))
 {
-}
-
-void USlice::ReInit(TArray<float> Data, FVector2D TargetPhysicalSize, const FIntPoint TargetResolution)
-{
-	*dynamic_cast<TArray*>(this) = std::move(Data);
-	PhysicalSize = std::move(TargetPhysicalSize);
-	Resolution = FIntVector2(TargetResolution.X, TargetResolution.Y);
-}
-
-TArray<float>& USlice::GetSliceData()
-{
-	return dynamic_cast<TArray&>(*this);
-}
-
-FVector2D& USlice::GetTargetPhysicalSize()
-{
-	return PhysicalSize;
-}
-
-FIntPoint USlice::GetTargetResolution()
-{
-	return { Resolution.X, Resolution.Y };
 }
 
 FPointCloud UActorSlicer::GeneratePointCloud(FVector SlicerBoxLocation, FVector SlicerBoxExtent, FIntVector PointDensity, bool DrawDebugInfo) const
@@ -171,7 +207,7 @@ FPointCloud UActorSlicer::GeneratePointCloud(FVector SlicerBoxLocation, FVector 
 	return Cloud;
 }
 
-void UActorSlicer::GenerateAndCachePointCloud(FVector SlicerBoxLocation, FVector SlicerBoxExtent, const FIntVector PointDensity)
+void UActorSlicer::GeneratePointCloud(FVector SlicerBoxLocation, FVector SlicerBoxExtent, const FIntVector PointDensity)
 {
 	if (!GetWorld())
 	{
@@ -179,13 +215,36 @@ void UActorSlicer::GenerateAndCachePointCloud(FVector SlicerBoxLocation, FVector
 		return;
 	}
 
-	CachedCloud = GeneratePointCloud(SlicerBoxLocation, SlicerBoxExtent, PointDensity, false);
-	UE_LOG(LogTemp, Log, TEXT("Point cloud: %s"), *CachedCloud->ToString());
+	const auto Cloud = GeneratePointCloud(SlicerBoxLocation, SlicerBoxExtent, PointDensity, false);
+	if (!Cache)
+	{
+		UE_LOG(LogTemp, Log, TEXT("Cache will not be used, reason: cache pointer is not set"));
+		return;
+	}
+	
+	Cache->SetCloudValue(CloudCacheTag, Cloud);
+}
+
+void UActorSlicer::GenerateOrLoadPointCloud(FVector SlicerBoxLocation, FVector SlicerBoxExtent,
+	const FIntVector PointDensity)
+{
+	if (Cache.IsValid())
+	{
+		bool Success;
+		Cache->GetCloud(CloudCacheTag, Success);
+		if (Success)
+		{
+			UE_LOG(LogTemp, Log, TEXT("Found cloud in cache, skip generation"))
+			return;
+		}
+	}
+
+	GeneratePointCloud(SlicerBoxLocation, SlicerBoxExtent, PointDensity);
 }
 
 bool UActorSlicer::IsCacheSet() const
 {
-	return CachedCloud.IsSet();
+	return !Cache.IsNull();
 }
 
 void UActorSlicer::DrawPointCloudFromCache(FVector SlicerBoxLocation, FVector SlicerBoxExtent)
@@ -195,22 +254,31 @@ void UActorSlicer::DrawPointCloudFromCache(FVector SlicerBoxLocation, FVector Sl
 		UE_LOG(LogTemp, Error, TEXT("Point cloud Cache is empty"));
 		return;
 	}
+
+	bool IsCloudCached;
+	auto CachedCloud = Cache->GetCloud(CloudCacheTag, IsCloudCached);
+	if (!IsCloudCached)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Point cloud is not in cache"));
+		return;
+	}
+	
 	const FVector Min = SlicerBoxLocation - SlicerBoxExtent;
 	const FVector Max = SlicerBoxLocation + SlicerBoxExtent;
 	const FVector Size = Max - Min;
-	const FVector Step = Size / FVector(CachedCloud->PointDensity);
+	const FVector Step = Size / FVector(CachedCloud.PointDensity);
 
-	for (int32 ZIndex = 0; ZIndex < CachedCloud->PointDensity.Z; ++ZIndex)
+	for (int32 ZIndex = 0; ZIndex < CachedCloud.PointDensity.Z; ++ZIndex)
 	{
-		for (int32 YIndex = 0; YIndex < CachedCloud->PointDensity.Y; ++YIndex)
+		for (int32 YIndex = 0; YIndex < CachedCloud.PointDensity.Y; ++YIndex)
 		{
-			for (int32 XIndex = 0; XIndex < CachedCloud->PointDensity.X; ++XIndex)
+			for (int32 XIndex = 0; XIndex < CachedCloud.PointDensity.X; ++XIndex)
 			{
 				FVector TestPoint = Min + FVector(XIndex * Step.X, YIndex * Step.Y, ZIndex * Step.Z);
 
 				FColor DebugColor;
-				const int32 Index = FPointCloud::ToPlainIndex({XIndex, YIndex, ZIndex}, CachedCloud->PointDensity);
-				if (CachedCloud->IsValid({XIndex, YIndex, ZIndex}) && CachedCloud->Points[Index])
+				const int32 Index = FPointCloud::ToPlainIndex({XIndex, YIndex, ZIndex}, CachedCloud.PointDensity);
+				if (CachedCloud.IsValid({XIndex, YIndex, ZIndex}) && CachedCloud.Points[Index])
 				{
 					DebugColor = FColor::Green;
 				}
@@ -244,7 +312,7 @@ struct FRectangleGrid
 		return Min + PlaneXAxis * XAlpha + PlaneYAxis * YAlpha;
 	}
 };
-TArray<float> UActorSlicer::CalculateSliceOnPlane(const FVector& PlaneOrigin,
+FSlice UActorSlicer::CalculateSliceOnPlane(const FVector& PlaneOrigin,
 		const FRotator& PlaneRotation,
 		const FVector& PointCloudExtent,
 		const FRotator& PointCloudRotation,
@@ -252,7 +320,14 @@ TArray<float> UActorSlicer::CalculateSliceOnPlane(const FVector& PlaneOrigin,
 		const FVector2D& ImagePhysicalSize,
 		const FIntPoint& TargetImageSize) const
 {
-	if (!CachedCloud.IsSet()) {
+	if (Cache.IsNull())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Point cloud is not cached!"));
+		return {};
+	}
+	bool IsCloudCached;
+	auto CachedCloud = Cache->GetCloud(CloudCacheTag, IsCloudCached);
+	if (!IsCloudCached) {
 		UE_LOG(LogTemp, Error, TEXT("Point cloud is not cached!"));
 		return {};
 	}
@@ -288,9 +363,8 @@ TArray<float> UActorSlicer::CalculateSliceOnPlane(const FVector& PlaneOrigin,
 	// Calculate cloud data
 	FVector Min = PointCloudOrigin - PointCloudExtent;
 	FVector Max = PointCloudOrigin + PointCloudExtent;
-
-	const FPointCloud& Cloud = CachedCloud.GetValue();
-	const FIntVector3& Density = Cloud.PointDensity;
+	
+	const FIntVector3& Density = CachedCloud.PointDensity;
 	const FVector3d Step = (Max - Min) / FVector3d(Density);
 	
 	for (int32 YIndex = 0; YIndex < TargetImageSize.Y; ++YIndex)
@@ -309,11 +383,11 @@ TArray<float> UActorSlicer::CalculateSliceOnPlane(const FVector& PlaneOrigin,
 			// Calculate average cloud value
 			auto GetValue = [&](const FIntVector &CloudCoords) -> float
 			{
-				if (!Cloud.IsValid(CloudCoords))
+				if (!CachedCloud.IsValid(CloudCoords))
 				{
 					return 0.f;
 				}
-				return Cloud.Points[Cloud.ToPlainIndex(CloudCoords, Density)];
+				return CachedCloud.Points[CachedCloud.ToPlainIndex(CloudCoords, Density)];
 			};
 			unsigned int ValueAccumulator = GetValue(LocalCloudCoords);
 			ValueAccumulator += GetValue({LocalCloudCoords.X + 1, LocalCloudCoords.Y, LocalCloudCoords.Z});
@@ -331,21 +405,51 @@ TArray<float> UActorSlicer::CalculateSliceOnPlane(const FVector& PlaneOrigin,
 		}
 	}
 
-	return Output;
+	FSlice Slice(Output, ImagePhysicalSize, TargetImageSize);
+	return Slice;
 }
 
-FString UActorSlicer::SliceToString(const TArray<float>& Src)
+FSlice UActorSlicer::CalculateOrLoadSliceOnPlane(const FVector& PlaneOrigin, const FRotator& PlaneRotation,
+	const FVector& PointCloudExtent, const FRotator& PointCloudRotation, const FVector& PointCloudOrigin,
+	const FVector2D& ImagePhysicalSize, const FIntPoint& TargetImageSize, const FName& SliceTag)
+{
+	if (Cache.IsNull())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Cache is null, can't calculate slice"));
+		return {};
+	}
+	
+	// Check for cache
+	bool Success;
+	FSlice SliceFromCache = Cache->GetSlice(CloudCacheTag, SliceTag, Success);
+
+	if (Success)
+	{
+		return SliceFromCache;
+	}
+
+	FSlice NewSlice = CalculateSliceOnPlane(PlaneOrigin, PlaneRotation, PointCloudExtent, PointCloudRotation, PointCloudOrigin, ImagePhysicalSize, TargetImageSize);
+	Cache->SetSlice(CloudCacheTag, SliceTag, NewSlice);
+	return NewSlice;
+}
+
+void UActorSlicer::CacheSlice(FSlice Slice, FName SliceTag)
+{
+	Cache->SetSlice(CloudCacheTag, SliceTag, std::move(Slice));
+}
+
+FString UActorSlicer::SliceToString(const FSlice& Src)
 {
 	FString Result;
-	Result.Reserve(Src.Num() + UKismetMathLibrary::Sqrt(Src.Num()));
+	Result.Reserve(Src.Data.Num() + UKismetMathLibrary::Sqrt(Src.Data.Num()));
 	
-	const int ImageSize = UKismetMathLibrary::Sqrt(Src.Num());
+	const int ImageSize = UKismetMathLibrary::Sqrt(Src.Data.Num());
 	for (int Y = 0; Y < ImageSize; ++Y)
 	{
 		for (int X = 0; X < ImageSize; ++X)
 		{
 			const int Index = X + Y * ImageSize;
-			const float Value = Src.IsValidIndex(Index) ? Src[Index] : 0.0f;
+			const float Value = Src.Data.IsValidIndex(Index) ? Src.Data[Index] : 0.0f;
 
 			if (Value >= 1)
 				Result += TEXT("X"); // full block
@@ -356,4 +460,3 @@ FString UActorSlicer::SliceToString(const TArray<float>& Src)
 	}
 	return Result;
 }
-
