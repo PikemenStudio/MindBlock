@@ -3,10 +3,7 @@
 
 #include "CloudCache.h"
 
-#include "JsonObjectConverter.h"
-#include "Kismet/KismetSystemLibrary.h"
-
-void UCloudCache::Save()
+void UCloudCache::Save() const
 {
 	const auto JsonObject = CloudPack.ToJsonObject({});
 	if (!JsonObject)
@@ -60,7 +57,7 @@ void UCloudCache::SetCloudValue(const FName& CloudTag, FPointCloud Cloud)
 FCloud UCloudCache::GetCloudWithSlices(const FName& CloudTag, bool &Success)
 {
 	const auto Value = CloudPack.Data.Find(CloudTag);
-	Success = Value;
+	Success = Value != nullptr;
 	if (Success)
 	{
 		return *Value;
@@ -71,7 +68,7 @@ FCloud UCloudCache::GetCloudWithSlices(const FName& CloudTag, bool &Success)
 FPointCloud UCloudCache::GetCloud(const FName& CloudTag, bool &Success)
 {
 	const auto Value = CloudPack.Data.Find(CloudTag);
-	Success = Value;
+	Success = Value != nullptr;
 	if ( Value)
 	{
 		return Value->PointCloud;
@@ -93,7 +90,7 @@ FSlice UCloudCache::GetSlice(const FName& CloudTag, const FName& SliceTag, bool 
 		return {};
 	}
 	const auto ResultValue = Value->SlicePack.Data.Find(SliceTag);
-	Success = ResultValue;
+	Success = ResultValue != nullptr;
 	if (Success)
 	{
 		return *ResultValue;
@@ -107,7 +104,7 @@ void UCloudCache::FillByTestData()
 	CloudPack.Data = {
 		{
 			"TestCloudTag", FCloud {
-				.PointCloud = FPointCloud({1, 1, 1 }, { 1, 1, 1}),
+				.PointCloud = FPointCloud({true, true, true }, { 1, 1, 1}),
 				.SlicePack = FSlicePack {
 					.Data = {{ "NewSliceTag", std::move(NewSlice) }}
 				}

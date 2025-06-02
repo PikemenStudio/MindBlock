@@ -97,6 +97,7 @@ public:
 	}
 
 private:
+	UPROPERTY()
 	UCanvasRenderTarget2D *RenderTarget {};
 
 	// Data modifiers

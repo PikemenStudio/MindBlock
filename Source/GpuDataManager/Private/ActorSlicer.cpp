@@ -2,10 +2,6 @@
 
 
 #include "ActorSlicer.h"
-
-#include <iomanip>
-#include <sstream>
-
 #include "JsonObjectConverter.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/KismetSystemLibrary.h"
@@ -109,10 +105,10 @@ void UActorSlicer::TickComponent(float DeltaTime, ELevelTick TickType, FActorCom
 	// ...
 }
 
-void UActorSlicer::SetCachePointer(const TSoftObjectPtr<UCloudCache> CachePtr, const FName CloudCacheTag)
+void UActorSlicer::SetCachePointer(const TSoftObjectPtr<UCloudCache> CachePtr, const FName NewCloudCacheTag)
 {
 	Cache = CachePtr;
-	this->CloudCacheTag = CloudCacheTag;
+	CloudCacheTag = NewCloudCacheTag;
 }
 
 int32 FPointCloud::ToPlainIndex(const FIntVector& Coord, const FIntVector& MatrixSize)

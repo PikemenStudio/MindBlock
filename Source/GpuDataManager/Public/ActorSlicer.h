@@ -37,7 +37,7 @@ public:
 	
 	// Methods
 	UFUNCTION(BlueprintCallable)
-	void SetCachePointer(const TSoftObjectPtr<UCloudCache> CachePtr, const FName CloudCacheTag);
+	void SetCachePointer(const TSoftObjectPtr<UCloudCache> CachePtr, const FName NewCloudCacheTag);
 
 	UFUNCTION(BlueprintCallable)
 	void GenerateOrLoadPointCloud(FVector SlicerBoxLocation, FVector SlicerBoxExtent, const FIntVector PointDensity);

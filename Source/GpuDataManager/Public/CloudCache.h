@@ -20,7 +20,7 @@ public:
 	// Work with disk
 	UFUNCTION(BlueprintCallable,
 		meta=(ToolTip="Save CloudPack to the disk, works on any platform"))
-	void Save();
+	void Save() const;
 
 	UFUNCTION(BlueprintCallable,
 		meta=(ToolTip="Update CloudPack data if necessary"))

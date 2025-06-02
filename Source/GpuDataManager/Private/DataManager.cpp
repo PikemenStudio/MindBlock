@@ -16,8 +16,6 @@ void ADataManager::OnCanvasRenderTargetUpdate(UCanvas* Canvas, int32 Width, int3
 
 	if (CurrentActiveArrayType.IsSet())
 	{
-		const FVector2d ScreenSize = {static_cast<double>(Width) / 2, static_cast<double>(Height) / 2};
-		
 		switch (CurrentActiveArrayType.GetValue())
 		{
 		case EArrayTypes::Float:
